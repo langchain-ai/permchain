@@ -96,6 +96,29 @@ async def test_invoke_single_process_in_out_reserved_is_last(
     }
 
 
+async def test_invoke_single_process_in_out_reserved_id_key() -> None:
+    chain = Channel.subscribe_to(["input"]).join(
+        [ReservedChannels.idempotency_key]
+    ) | Channel.write_to("output")
+
+    app = Pregel(chains={"one": chain})
+
+    assert app.input_schema.schema() == {"title": "PregelInput"}
+    assert app.output_schema.schema() == {"title": "PregelOutput"}
+    assert await app.ainvoke(2) == {
+        "input": 2,
+        "idempotency_key": "b85046bb798101e60bbe82d15e18fd530eadb2c0064114ec4fae1de68d57174b",
+    }
+    assert await app.ainvoke(2) == {
+        "input": 2,
+        "idempotency_key": "b85046bb798101e60bbe82d15e18fd530eadb2c0064114ec4fae1de68d57174b",
+    }
+    assert await app.ainvoke(3) == {
+        "input": 3,
+        "idempotency_key": "5d45520557a38c1bb2e12b4e09161d5c095c38e92df5ea914e076177f117863c",
+    }
+
+
 async def test_invoke_single_process_in_out_dict(mocker: MockerFixture) -> None:
     add_one = mocker.Mock(side_effect=lambda x: x + 1)
     chain = Channel.subscribe_to("input") | add_one | Channel.write_to("output")
